@@ -1,4 +1,5 @@
 import { CustomItemRoll, CustomRoll } from "./custom-roll.js";
+import { migrateChatMessage } from "./migration.js";
 import { BRSettings } from "./settings.js";
 import { i18n, Utils } from "./utils/index.js";
 
@@ -8,12 +9,15 @@ import { i18n, Utils } from "./utils/index.js";
  * with BetterRollsChatCard.bind().
  */
 export class BetterRollsChatCard {
+	/** Min version to enable the card on, to prevent breakage */
+	static min_version = "2.0.0";
+
 	constructor(message, html) {
 		this.updateBinding(message, html);
 	}
 
 	get message() {
-		return ChatMessage.collection.get(this.id);
+		return game.messages.get(this.id);
 	}
 
 	/**
@@ -29,11 +33,12 @@ export class BetterRollsChatCard {
 		this.id = message.id;
 		this.roll = CustomItemRoll.fromMessage(message);
 		this.speaker = game.actors.get(message.data.speaker.actor);
+		message.BetterRoll = this.roll;
 
 		// Hide Save DCs
 		const actor = this.speaker;
 		if ((!actor && !game.user.isGM) || actor?.permission != 3) {
-			html.find(".hideSave").text(i18n("br5e.hideDC.string"));
+			html.find(".hideSave").text(i18n("brSnS.hideDC.string"));
 		}
 
 		// Setup the events for card buttons (the permanent ones, not the hover ones)
@@ -47,7 +52,7 @@ export class BetterRollsChatCard {
 				hoverInitialized = true;
 				await this._setupOverlayButtons(html);
 				this._onHover(html);
-				console.log("BetterRolls5e | Hover Buttons Initialized");
+				console.log("BetterRollsSnS | Hover Buttons Initialized");
 			}
 		})
 	}
@@ -58,16 +63,21 @@ export class BetterRollsChatCard {
 	 * @param {ChatMessage} message
 	 * @param {JQuery} html
 	 */
-	static bind(message, html) {
+	static async bind(message, html) {
 		const chatCard = html.find('.red-full');
 		if (chatCard.length === 0) {
+			return null;
+		}
+
+		// If the card needs to be migrated, skip the binding
+		if (await migrateChatMessage(message)) {
 			return null;
 		}
 
 		// Check if the card already exists
 		const existing = message.BetterRollsCardBinding;
 		if (existing) {
-			console.log("BetterRolls5e | Retrieved existing card");
+			console.log("BetterRollsSnS | Retrieved existing card");
 			existing.updateBinding(message, chatCard);
 
 			// Pulse the card to make it look more obvious
@@ -81,7 +91,7 @@ export class BetterRollsChatCard {
 			}, 0);
 
 			// Scroll to bottom if the last card had updated
-			const last = ChatMessage.collection.entries[ChatMessage.collection.entries.length - 1];
+			const last = game.messages.contents[game.messages.size - 1];
 			if (last?.id === existing.id) {
 				window.setTimeout(() => { ui.chat.scrollBottom(); }, 0);
 			}
@@ -103,13 +113,13 @@ export class BetterRollsChatCard {
 		const getBinding = (li) => game.messages.get(li.data("messageId"))?.BetterRollsCardBinding;
 
 		options.push({
-			name: i18n("br5e.chatContext.repeat"),
+			name: i18n("brSnS.chatContext.repeat"),
 			icon: '<i class="fas fa-redo"></i>',
 			condition: li => {
 				const binding = getBinding(li);
 				return binding && binding.roll.canRepeat();
 			},
-			callback: li => getBinding(li)?.roll.repeat()
+			callback: li => getBinding(li)?.roll.repeat({ event })
 		})
 	}
 
@@ -121,7 +131,7 @@ export class BetterRollsChatCard {
 	 */
 	async _setupOverlayButtons(html) {
 		// Add reroll button
-		if (this.roll?.canRepeat() && BRSettings.chatDamageButtonsEnabled) {
+		if (this.roll?.canRepeat()) {
 			const templateHeader = await renderTemplate("modules/betterrollsSnS/templates/red-overlay-header.html");
 			html.find(".card-header").append($(templateHeader));
 		}
@@ -155,79 +165,96 @@ export class BetterRollsChatCard {
 		}
 
 		// Setup augment crit and apply damage button
-		// Note: For backwards compatibility, these find on the HTML rather than use the roll models
-		if (BRSettings.chatDamageButtonsEnabled) {
-			const templateDamage = await renderTemplate("modules/betterrollsSnS/templates/red-overlay-damage.html");
-			const dmgElements = html.find('.dice-total .red-base-die, .dice-total .red-extra-die').parents('.dice-row').toArray();
-			const customElements = html.find('[data-type=custom] .red-base-die').toArray();
+		const templateName = (BRSettings.chatDamageButtonsEnabled) ? "red-overlay-damage" : "red-overlay-damage-crit-only";
+		const templateDamage = await renderTemplate(`modules/betterrollsSnS/templates/${templateName}.html`);
+		const dmgElements = html.find('.dice-total .red-base-die, .dice-total .red-extra-die').parents('.dice-row').toArray();
+		const customElements = html.find('[data-type=custom] .red-base-die').toArray();
 
-			// Add chat damage buttons
-			[...dmgElements, ...customElements].forEach(element => {
-				element = $(element);
-				element.append($(templateDamage));
+		// Add chat damage buttons
+		[...dmgElements, ...customElements].forEach(element => {
+			element = $(element);
+			element.append($(templateDamage));
 
-				// Remove crit button if already rolled
-				// TODO: Move this elsewhere. There's a known bug when crit settings are changed suddenly
-				// If Crit (setting) is disabled, then re-enabled, crit buttons don't get re-added
-				const id = element.parents('.dice-roll').attr('data-id');
-				const entry = this.roll?.entries.find(m => m.id === id);
-				if (!this.roll?.canCrit(entry)) {
-					element.find('.crit-button').remove();
+			// Remove crit button if already rolled
+			// TODO: Move this elsewhere. There's a known bug when crit settings are changed suddenly
+			// If Crit (setting) is disabled, then re-enabled, crit buttons don't get re-added
+			const id = element.parents('.dice-roll').attr('data-id');
+			const entry = this.roll?.getEntry(id);
+			if (!this.roll?.canCrit(entry)) {
+				element.find('.crit-button').remove();
+			}
+		});
+
+		// Handle apply damage overlay button events
+		html.find('.apply-damage-buttons button').click(async ev => {
+			ev.preventDefault();
+			ev.stopPropagation();
+
+			// find out the proper dmg thats supposed to be applied
+			const dmgElement = $(ev.target.parentNode.parentNode.parentNode.parentNode);
+			const damageType = dmgElement.find(".dice-total").attr("data-damagetype");
+			let dmg = dmgElement.find('.red-base-die').text();
+
+			if (dmgElement.find('.red-extra-die').length > 0) {
+				const critDmg = dmgElement.find('.red-extra-die').text();
+				const dialogPosition = {
+					x: ev.originalEvent.screenX,
+					y: ev.originalEvent.screenY
+				};
+
+				dmg = await this._resolveCritDamage(Number(dmg), Number(critDmg), dialogPosition);
+			}
+
+			// getting the modifier depending on which of the buttons was pressed
+			const modifier = $(ev.target).closest("button").attr('data-modifier');
+
+			// applying dmg to the targeted token and sending only the span that the button sits in
+			for (const actor of Utils.getTargetActors()) {
+				await this.applyDamage(actor, damageType, dmg, modifier)
+			}
+
+			setTimeout(() => {
+				if (canvas.hud.token._displayState && canvas.hud.token._displayState !== 0) {
+					canvas.hud.token.render();
 				}
-			});
+			}, 50);
+		});
 
-			// Handle apply damage overlay button events
-			html.find('.apply-damage-buttons button').click(async ev => {
-				ev.preventDefault();
-				ev.stopPropagation();
-
-				// find out the proper dmg thats supposed to be applied
-				const dmgElement = $(ev.target.parentNode.parentNode.parentNode.parentNode);
-				let dmg = dmgElement.find('.red-base-die').text();
-
-				if (dmgElement.find('.red-extra-die').length > 0) {
-					const critDmg = dmgElement.find('.red-extra-die').text();
-					const dialogPosition = {
-						x: ev.originalEvent.screenX,
-						y: ev.originalEvent.screenY
-					};
-
-					dmg = await this._resolveCritDamage(Number(dmg), Number(critDmg), dialogPosition);
-				}
-
-				// getting the modifier depending on which of the buttons was pressed
-				let modifier = ev.target.dataset.modifier;
-
-				// sometimes the image within the button triggers the event, so we have to make sure to get the proper modifier value
-				if (modifier === undefined) {
-					modifier = $(ev.target).parent().attr('data-modifier');
-				}
-
-				// applying dmg to the targeted token and sending only the span that the button sits in
-				const targetActors = Utils.getTargetActors() || [];
-				targetActors.forEach(actor => { actor.applyDamage(dmg, modifier) })
-
-				setTimeout(() => {
-					if (canvas.hud.token._displayState && canvas.hud.token._displayState !== 0) {
-						canvas.hud.token.render();
-					}
-				}, 50);
-			});
-
-			// Handle crit button application event
-			html.find('.crit-button').on('click', async (ev) => {
-				ev.preventDefault();
-				ev.stopPropagation();
-				const group = $(ev.target).parents('.dice-roll').attr('data-group');
-				if (await this.roll.forceCrit(group)) {
-					await this.roll.update();
-				}
-			});
-		}
+		// Handle crit button application event
+		html.find('.crit-button').off().on('click', async (ev) => {
+			ev.preventDefault();
+			ev.stopPropagation();
+			const group = $(ev.target).parents('.dice-roll').attr('data-group');
+			if (await this.roll.forceCrit(group)) {
+				await this.roll.update();
+			}
+		});
 
 		// Enable Hover Events (to show/hide the elements)
 		this._onHoverEnd(html);
 		html.hover(this._onHover.bind(this, html), this._onHoverEnd.bind(this, html));
+	}
+
+	async applyDamage(actor, damageType, damage, modifier) {
+		if (damageType === "temphp" && modifier < 0) {
+			const healing = Math.abs(modifier) * damage;
+			const actorData = actor.data.data;
+			if (actorData.attributes.hp.temp > 0) {
+				const overwrite = await Dialog.confirm({
+					title: i18n("brSnS.chat.damageButtons.tempOverwrite.title"),
+					content: i18n("brSnS.chat.damageButtons.tempOverwrite.content", {
+						original: actorData.attributes.hp.temp,
+						new: healing
+					})
+				});
+
+				if (!overwrite) return;
+			}
+
+			await actor.update({ "data.attributes.hp.temp": healing });
+		} else {
+			await actor.applyDamage(damage, modifier);
+		}
 	}
 
 	_onHover(html) {
@@ -259,17 +286,17 @@ export class BetterRollsChatCard {
 				};
 
 				const data = {
-					title: i18n("br5e.chat.damageButtons.critPrompt.title"),
+					title: i18n("brSnS.chat.damageButtons.critPrompt.title"),
 					content: "",
 					buttons: {
 						one: {
 							icon: '<i class="fas fa-check"></i>',
-							label: i18n("br5e.chat.damageButtons.critPrompt.yes"),
+							label: i18n("brSnS.chat.damageButtons.critPrompt.yes"),
 							callback: () => { resolve(dmg + critdmg); }
 						},
 						two: {
 							icon: '<i class="fas fa-times"></i>',
-							label: i18n("br5e.chat.damageButtons.critPrompt.no"),
+							label: i18n("brSnS.chat.damageButtons.critPrompt.no"),
 							callback: () => { resolve(dmg); }
 						}
 					},
@@ -297,25 +324,48 @@ export class BetterRollsChatCard {
 			button.disabled = true;
 
 			const action = button.dataset.action;
+			try {
+				await this._performAction(action, button.dataset, event);
+			} finally {
+				// Re-enable the button after a delay
+				setTimeout(() => (button.disabled = false), 0);
+			}
+		});
+	}
 
-			if (action === "save") {
-				const actors = Utils.getTargetActors({ required: true });
-				const ability = button.dataset.ability;
-				const params = await Utils.eventToAdvantage(event);
-				for (const actor of actors) {
-					CustomRoll.rollAttribute(actor, ability, "save", params);
-				}
-			} else if (action === "damage") {
-				const group = encodeURIComponent(button.dataset.group);
-				if (await this.roll.rollDamage(group)) {
-					await this.roll.update();
-				}
-			} else if (action === "repeat") {
-				await this.roll.repeat();
+	async _performAction(action, data, event={}) {
+		if (action === "save") {
+			const actors = Utils.getTargetActors({ required: true });
+			const ability = data.ability;
+			const params = Utils.eventToAdvantage(event);
+			for (const actor of actors) {
+				CustomRoll.rollAttribute(actor, ability, "save", params);
+			}
+		} else if (action === "damage") {
+			const group = encodeURIComponent(data.group);
+			if (await this.roll.rollDamage(group)) {
+				await this.roll.update();
+			}
+		} else if (action === "repeat") {
+			await this.roll.repeat({ event });
+		} else if (action === "apply-active-effects") {
+			if (!window.DAE) {
+				return ui.notifications.warn(i18n("brSnS.error.noDAE"));
 			}
 
-			// Re-enable the button
-			setTimeout(() => {button.disabled = false;}, 1);
-		});
+			const roll = this.roll;
+			let item = await roll.getItem();
+			if (data.ammo) {
+				item = item.parent.items.get(item.data.data.consume.target)
+			}
+			const targets = game.user.targets.size ? game.user.targets : Utils.getTargetTokens();
+			window.DAE.doEffects(item, true, targets, {
+				whisper: false,
+				spellLevel: roll.params.slotLevel,
+				damageTotal: roll.totalDamage,
+				critical: roll.isCrit,
+				itemCardId: this.id
+			});
+		}
 	}
 }

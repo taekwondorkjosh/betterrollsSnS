@@ -1,5 +1,6 @@
 import { sns, i18n, ActorUtils, ItemUtils, Utils } from "./utils/index.js";
 import { BRSettings, getSettings } from "./settings.js";
+import { isSave } from "./betterrollsSnS.js";
 
 /**
  * Roll type for advantage/disadvantage/etc
@@ -115,7 +116,7 @@ export class RollFields {
 				bonus: bonusRoll
 			};
 		} catch (err) {
-			ui.notifications.error(i18n("br5e.error.rollEvaluation", { msg: err.message}));
+			ui.notifications.error(i18n("brSnS.error.rollEvaluation", { msg: err.message}));
 			throw err; // propagate the error
 		}
 	}
@@ -152,7 +153,7 @@ export class RollFields {
 		// Get ammo bonus and add to title if title not given
 		// Note that "null" is a valid title, so we can't override that
 		if (typeof title === 'undefined') {
-			title = i18n("br5e.chat.attack");
+			title = i18n("brSnS.chat.attack");
 			const consume = item?.data.data.consume;
 			if ((consume?.type === 'ammo') && !!actor.items) {
 				const ammo = actor.items.get(consume.target);
@@ -226,11 +227,11 @@ export class RollFields {
 		// If no formula was given, derive from the item
 		if (!formula && item) {
 			const itemData = item.data.data;
-			const flags = item.data.flags.betterRolls5e;
+			const flags = item.data.flags.betterRollsSnS;
 
 			if (damageIndex === "other") {
 				formula = itemData.formula;
-				title = title ?? i18n("br5e.chat.other");
+				title = title ?? i18n("brSnS.chat.other");
 				context = context ?? flags.quickOther.context;
 			} else {
 				// If versatile, use properties from the first entry
@@ -246,7 +247,8 @@ export class RollFields {
 				}
 
 				// Add any roll bonuses but only to the first entry
-				if (isFirst && rollData.bonuses) {
+				const isAmmo = item.data.type === "consumable" && item.data.data.consumableType === "ammo";
+				if (isFirst && rollData.bonuses && !isAmmo) {
 					const actionType = `${itemData.actionType}`;
 					const bonus = rollData.bonuses[actionType]?.damage;
 					if (bonus && (parseInt(bonus) !== 0)) {
@@ -258,6 +260,9 @@ export class RollFields {
 
 		// Require a formula to continue
 		if (!formula) {
+			if (isVersatile) {
+				ui.notifications.warn('brSnS.error.noVersatile', { localize: true });
+			}
 			return null;
 		}
 
@@ -286,7 +291,7 @@ export class RollFields {
 				critRoll
 			};
 		} catch (err) {
-			ui.notifications.error(i18n("br5e.error.rollEvaluation", { msg: err.message}));
+			ui.notifications.error(i18n("brSnS.error.rollEvaluation", { msg: err.message}));
 			throw err; // propagate the error
 		}
 	}
@@ -322,7 +327,7 @@ export class RollFields {
 		// If no formula was given, derive from the item
 		if (!formula && item) {
 			const itemData = item.data.data;
-			const flags = item.data.flags.betterRolls5e;
+			const flags = item.data.flags.betterRollsSnS;
 			const damageIndex = Number(options.damageIndex ?? flags.critDamage?.value);
 			formula = itemData.damage.parts[damageIndex][0];
 			damageType = damageType ?? itemData.damage.parts[damageIndex][1];
@@ -346,7 +351,7 @@ export class RollFields {
 				critRoll
 			};
 		} catch (err) {
-			ui.notifications.error(i18n("br5e.error.rollEvaluation", { msg: err.message}));
+			ui.notifications.error(i18n("brSnS.error.rollEvaluation", { msg: err.message}));
 			throw err; // propagate the error
 		}
 	}
@@ -402,11 +407,12 @@ export class RollFields {
 	 * Generates the html for a save button to be inserted into a chat message. Players can click this button to perform a roll through their controlled token.
 	 * @returns {import("./renderer.js").ButtonSaveProps}
 	 */
-	static constructSaveButton({ item, abl = null, dc = null, settings }) {
+	static constructSaveButton({ item, abl = null, dc = null, context = null, settings }) {
 		const actor = item?.actor;
 		const saveData = ItemUtils.getSave(item);
 		if (abl) { saveData.ability = abl; }
 		if (dc) { saveData.dc = dc; }
+		if (context) { saveData.context = context; }
 
 		// Determine whether the DC should be hidden
 		const hideDCSetting = getSettings(settings).hideDC;
@@ -463,6 +469,16 @@ export class RollFields {
 			case 'savedc':
 				// {customAbl: null, customDC: null}
 				return [RollFields.constructSaveButton({ settings, ...data })];
+			case 'ammosavedc':
+				// {customAbl: null, customDC: null}
+				if (!data.ammo || !isSave(data.ammo)) return [];
+
+				return [RollFields.constructSaveButton({
+					settings,
+					...data,
+					item: data.ammo,
+					context: `${data.ammo.name}`
+				 })];
 			case 'custom':
 				const { title, rolls, formula, rollState } = data;
 				const rollData = Utils.getRollData({ item, actor });
@@ -475,17 +491,12 @@ export class RollFields {
 				})];
 			case 'description':
 			case 'desc':
-				// Display info from Components module
-				let componentField = "";
-				if (game.modules.get("components5e") && game.modules.get("components5e").active) {
-					componentField = window.ComponentsModule.getComponentHtml(item, 20);
-				}
-				data = {text: `${componentField}${item.data.data.description.value ?? ''}`.trim()};
 			case 'text':
-				if (data.text) {
+				const textFieldValue = data.text ?? data.content ?? item?.data.data.description.value;
+				if (textFieldValue) {
 					return [{
 						type: "description",
-						content: data.text
+						content: TextEditor.enrichHTML(textFieldValue ?? '').trim()
 					}];
 				}
 				break;

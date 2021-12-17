@@ -1,4 +1,4 @@
-import { i18n } from "./utils/index.js";
+import { i18n, Utils } from "./utils/index.js";
 
 const getBRSetting = (setting) => game.settings.get("betterrollsSnS", setting);
 
@@ -11,93 +11,103 @@ class Settings {
 	 * This should only be called once, at initialization.
 	 */
 	init() {
+		// Special non-config flag to handle migrations
+		game.settings.register("betterrollsSnS", "migration", {
+			config: false,
+			default: { status: false, version: Utils.getVersion() },
+			scope: 'world',
+			type: Object
+		});
+
 		game.settings.register("betterrollsSnS", "d20Mode", {
-			name: i18n("br5e.d20Mode.name"),
-			hint: i18n("br5e.d20Mode.hint"),
+			name: i18n("brSnS.d20Mode.name"),
+			hint: i18n("brSnS.d20Mode.hint"),
 			scope: "world",
 			config: true,
-			default: 2,
+			default: 1,
 			type: Number,
 			choices: {
-				1: i18n("br5e.d20Mode.choices.1"),
-				2: i18n("br5e.d20Mode.choices.2"),
-				3: i18n("br5e.d20Mode.choices.3"),
-				4: i18n("br5e.d20Mode.choices.4")
+				1: i18n("brSnS.d20Mode.choices.1"),
+				2: i18n("brSnS.d20Mode.choices.2"),
+				3: i18n("brSnS.d20Mode.choices.3"),
+				4: i18n("brSnS.d20Mode.choices.4")
 			}
 		});
 
-		/**
-		 * Enables damage buttons
-		 */
+		// Enables damage buttons
 		game.settings.register("betterrollsSnS", "damagePromptEnabled", {
-			name: i18n("br5e.damagePromptEnabled.name"),
-			hint: i18n("br5e.damagePromptEnabled.hint"),
+			name: i18n("brSnS.damagePromptEnabled.name"),
+			hint: i18n("brSnS.damagePromptEnabled.hint"),
 			scope: "world",
 			config: true,
 			default: false,
 			type: Boolean
 		});
 
-		/**
-		 * Used to enable showing the natural die roll for a d20 roll.
-		 */
-		game.settings.register("betterrollsSnS", "d20RollIconsEnabled", {
-			name: i18n("br5e.d20RollIconsEnabled.name"),
-			hint: i18n("br5e.d20RollIconsEnabled.hint"),
-			scope: "world",
-			config: true,
-			default: true,
-			type: Boolean
-		});
-
-		/**
-		* Register added roll buttons
-		*/
+		// Register added roll buttons
 		game.settings.register("betterrollsSnS", "rollButtonsEnabled", {
-			name: i18n("br5e.rollButtonsEnabled.name"),
-			hint: i18n("br5e.rollButtonsEnabled.hint"),
+			name: i18n("brSnS.rollButtonsEnabled.name"),
+			hint: i18n("brSnS.rollButtonsEnabled.hint"),
 			scope: "world",
 			config: true,
 			default: true,
 			type: Boolean
 		});
 
-		/**
-		* Register better roll for icon
-		*/
+		// Register better roll for items
 		game.settings.register("betterrollsSnS", "imageButtonEnabled", {
-			name: i18n("br5e.imageButtonEnabled.name"),
-			hint: i18n("br5e.imageButtonEnabled.hint"),
+			name: i18n("brSnS.imageButtonEnabled.name"),
+			hint: i18n("brSnS.imageButtonEnabled.hint"),
 			scope: "world",
 			config: true,
 			default: true,
 			type: Boolean
 		});
 
+		// Does Alt Click perform an Alt Roll?
 		game.settings.register("betterrollsSnS", "altSecondaryEnabled", {
-			name: i18n("br5e.altSecondaryEnabled.name"),
-			hint: i18n("br5e.altSecondaryEnabled.hint"),
+			name: i18n("brSnS.altSecondaryEnabled.name"),
+			hint: i18n("brSnS.altSecondaryEnabled.hint"),
 			scope: "world",
 			config: true,
 			default: true,
 			type: Boolean
 		});
 
-		/**
-		* Register quick roll defaults for description
-		*/
+		// Show Apply Active Effects Button
+		game.settings.register("betterrollsSnS", "applyActiveEffects", {
+			name: i18n("brSnS.applyActiveEffects.name"),
+			hint: i18n("brSnS.applyActiveEffects.hint"),
+			scope: "world",
+			config: true,
+			default: true,
+			type: Boolean
+		})
+
+		// Register quick roll defaults for description
 		game.settings.register("betterrollsSnS", "quickDefaultDescriptionEnabled", {
-			name: i18n("br5e.quickDefaultDescriptionEnabled.name"),
-			hint: i18n("br5e.quickDefaultDescriptionEnabled.hint"),
+			name: i18n("brSnS.quickDefaultDescriptionEnabled.name"),
+			hint: i18n("brSnS.quickDefaultDescriptionEnabled.hint"),
 			scope: "world",
 			config: true,
 			default: false,
 			type: Boolean
 		});
 
+		// Used to enable visually showing the natural die roll for a d20 roll.
+		game.settings.register("betterrollsSnS", "d20RollIconsEnabled", {
+			name: i18n("brSnS.d20RollIconsEnabled.name"),
+			hint: i18n("brSnS.d20RollIconsEnabled.hint"),
+			scope: "world",
+			config: true,
+			default: true,
+			type: Boolean
+		});
+
+		// Actor Roll Image Choices
 		game.settings.register("betterrollsSnS", "defaultRollArt", {
-			name: i18n("br5e.defaultRollArt.name"),
-			hint: i18n("br5e.defaultRollArt.hint"),
+			name: i18n("brSnS.defaultRollArt.name"),
+			hint: i18n("brSnS.defaultRollArt.hint"),
 			scope: "world",
 			config: true,
 			default: "actor",
@@ -108,19 +118,17 @@ class Settings {
 			}
 		});
 
-		/**
-		* Register roll label options
-		*/
+		// Register roll label options
 		game.settings.register("betterrollsSnS", "rollTitlePlacement", {
-			name: i18n("br5e.rollTitlePlacement.name"),
-			hint: i18n("br5e.rollTitlePlacement.hint"),
+			name: i18n("brSnS.rollTitlePlacement.name"),
+			hint: i18n("brSnS.rollTitlePlacement.hint"),
 			scope: "world",
 			config: true,
 			default: "1",
 			type: String,
 			choices: {
-				"0": i18n("br5e.damageRollPlacement.choices.0"),
-				"1": i18n("br5e.damageRollPlacement.choices.1")
+				"0": i18n("brSnS.damageRollPlacement.choices.0"),
+				"1": i18n("brSnS.damageRollPlacement.choices.1")
 			}
 		});
 
@@ -128,17 +136,17 @@ class Settings {
 
 		damagePlacementOptions.forEach(placementOption => {
 			game.settings.register("betterrollsSnS", placementOption, {
-				name: i18n(`br5e.${placementOption}.name`),
-				hint: i18n(`br5e.${placementOption}.hint`),
+				name: i18n(`brSnS.${placementOption}.name`),
+				hint: i18n(`brSnS.${placementOption}.hint`),
 				scope: "world",
 				config: true,
 				default: "1",
 				type: String,
 				choices: {
-					"0": i18n("br5e.damageRollPlacement.choices.0"),
-					"1": i18n("br5e.damageRollPlacement.choices.1"),
-					"2": i18n("br5e.damageRollPlacement.choices.2"),
-					"3": i18n("br5e.damageRollPlacement.choices.3")
+					"0": i18n("brSnS.damageRollPlacement.choices.0"),
+					"1": i18n("brSnS.damageRollPlacement.choices.1"),
+					"2": i18n("brSnS.damageRollPlacement.choices.2"),
+					"3": i18n("brSnS.damageRollPlacement.choices.3")
 				}
 			});
 		});
@@ -147,8 +155,8 @@ class Settings {
 
 		contextReplacementOptions.forEach(contextOption => {
 			game.settings.register("betterrollsSnS", contextOption, {
-				name: i18n(`br5e.${contextOption}.name`),
-				hint: i18n(`br5e.${contextOption}.hint`),
+				name: i18n(`brSnS.${contextOption}.name`),
+				hint: i18n(`brSnS.${contextOption}.hint`),
 				scope: "world",
 				config: true,
 				default: false,
@@ -157,24 +165,24 @@ class Settings {
 		});
 
 		game.settings.register("betterrollsSnS", "critBehavior", {
-			name: i18n("br5e.critBehavior.name"),
-			hint: i18n("br5e.critBehavior.hint"),
+			name: i18n("brSnS.critBehavior.name"),
+			hint: i18n("brSnS.critBehavior.hint"),
 			scope: "world",
 			config: true,
 			default: "1",
 			type: String,
 			choices: {
-				"0": i18n("br5e.critBehavior.choices.0"), // No Extra Damage
-				"1": i18n("br5e.critBehavior.choices.1"), // Roll Critical Damage Dice
-				"2": i18n("br5e.critBehavior.choices.2"), // Roll Base Damage, Max Critical
-				"3": i18n("br5e.critBehavior.choices.3"), // Max Base & Critical Damage
-				"4": i18n("br5e.critBehavior.choices.4"), // Max Base Damage, Roll Critical Damage
+				"0": i18n("brSnS.critBehavior.choices.0"), // No Extra Damage
+				"1": i18n("brSnS.critBehavior.choices.1"), // Roll Critical Damage Dice
+				"2": i18n("brSnS.critBehavior.choices.2"), // Roll Base Damage, Max Critical
+				"3": i18n("brSnS.critBehavior.choices.3"), // Max Base & Critical Damage
+				"4": i18n("brSnS.critBehavior.choices.4"), // Max Base Damage, Roll Critical Damage
 			}
 		});
 
 		game.settings.register("betterrollsSnS", "critString", {
-			name: i18n("br5e.critString.name"),
-			hint: i18n("br5e.critString.hint"),
+			name: i18n("brSnS.critString.name"),
+			hint: i18n("brSnS.critString.hint"),
 			scope: "world",
 			config: true,
 			default: "Crit",
@@ -182,17 +190,22 @@ class Settings {
 		});
 
 		game.settings.register("betterrollsSnS", "chatDamageButtonsEnabled", {
-			name: i18n("br5e.chatDamageButtonsEnabled.name"),
-			hint: i18n("br5e.chatDamageButtonsEnabled.hint"),
+			name: i18n("brSnS.chatDamageButtonsEnabled.name"),
+			hint: i18n("brSnS.chatDamageButtonsEnabled.hint"),
 			scope: "world",
 			config: true,
-			default: true,
-			type: Boolean
+			default: "1",
+			type: String,
+			choices: {
+				"0": i18n("brSnS.chatDamageButtonsEnabled.choices.0"),
+				"1": i18n("brSnS.chatDamageButtonsEnabled.choices.1"),
+				"2": i18n("brSnS.chatDamageButtonsEnabled.choices.2"),
+			}
 		});
 
 		game.settings.register("betterrollsSnS", "playRollSounds", {
-			name: i18n("br5e.playRollSounds.name"),
-			hint: i18n("br5e.playRollSounds.hint"),
+			name: i18n("brSnS.playRollSounds.name"),
+			hint: i18n("brSnS.playRollSounds.hint"),
 			scope: "world",
 			config: true,
 			default: true,
@@ -200,16 +213,16 @@ class Settings {
 		});
 
 		game.settings.register("betterrollsSnS", "hideDC", {
-			name: i18n("br5e.hideDC.name"),
-			hint: i18n("br5e.hideDC.hint"),
+			name: i18n("brSnS.hideDC.name"),
+			hint: i18n("brSnS.hideDC.hint"),
 			scope: "world",
 			config: true,
 			default: "0",
 			type: String,
 			choices: {
-				"0": i18n("br5e.hideDC.choices.0"),
-				"1": i18n("br5e.hideDC.choices.1"),
-				"2": i18n("br5e.hideDC.choices.2"),
+				"0": i18n("brSnS.hideDC.choices.0"),
+				"1": i18n("brSnS.hideDC.choices.1"),
+				"2": i18n("brSnS.hideDC.choices.2"),
 			}
 		});
 	}
@@ -231,7 +244,7 @@ class Settings {
 	}
 
 	get damageContextPlacement() {
-		return getBRSetting("damageContextPlacement");
+		return getBRSetting("damageContextPlacement") || "0";
 	}
 
 	get contextReplacesTitle() {
@@ -262,6 +275,10 @@ class Settings {
 		return getBRSetting("altSecondaryEnabled");
 	}
 
+	get applyActiveEffects() {
+		return getBRSetting("applyActiveEffects");
+	}
+
 	get d20Mode() {
 		return getBRSetting("d20Mode");
 	}
@@ -271,7 +288,8 @@ class Settings {
 	}
 
 	get chatDamageButtonsEnabled() {
-		return getBRSetting("chatDamageButtonsEnabled");
+		const setting = getBRSetting("chatDamageButtonsEnabled");
+		return setting === "1" || (setting === "2" && game.user.isGM);
 	}
 
 	/**

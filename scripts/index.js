@@ -1,8 +1,10 @@
 import { BRSettings } from "./settings.js";
 import { BetterRollsChatCard } from "./chat-message.js";
-import { addItemSheetButtons, BetterRolls, changeRollsToDual } from "./betterrollsSnS.js";
-import { ItemUtils } from "./utils/index.js";
+import { addItemSheetButtons, BetterRolls } from "./betterrollsSnS.js";
+import { ItemUtils, Utils } from "./utils/index.js";
 import { addBetterRollsContent } from "./item-tab.js";
+import { patchCoreFunctions } from "./patching/index.js"
+import { migrate } from "./migration.js";
 
 // Attaches BetterRolls to actor sheet
 Hooks.on("renderActorSheet5e", (app, html, data) => {
@@ -11,8 +13,9 @@ Hooks.on("renderActorSheet5e", (app, html, data) => {
 
 	// this timeout allows other modules to modify the sheet before we do
 	setTimeout(() => {
-		game.settings.get("betterrollsSnS", "rollButtonsEnabled") ? addItemSheetButtons(app.object, html, data, triggeringElement, buttonContainer) : null;
-		changeRollsToDual(app.object, html, data);
+		if (game.settings.get("betterrollsSnS", "rollButtonsEnabled")) {
+			addItemSheetButtons(app.object, html, data, triggeringElement, buttonContainer)
+		}
 	}, 0);
 });
 
@@ -23,6 +26,7 @@ Hooks.on("renderItemSheet5e", (app, html, data) => {
 
 Hooks.once("init", () => {
 	BRSettings.init();
+	patchCoreFunctions();
 
 	// Setup template partials
 	const prefix = "modules/betterrollsSnS/templates"
@@ -31,17 +35,26 @@ Hooks.once("init", () => {
 	]);
 });
 
-Hooks.on("ready", () => {
+Hooks.on("ready", async () => {
+	await migrate();
+
 	// Make a combined damage type array that includes healing
 	const sns = CONFIG.SNS;
-	CONFIG.betterRolls5e.combinedDamageTypes = mergeObject(duplicate(sns.damageTypes), sns.healingTypes);
+	CONFIG.betterRollsSnS.combinedDamageTypes = mergeObject(duplicate(sns.damageTypes), sns.healingTypes);
 
 	// Updates crit text from the dropdown.
 	let critText = BRSettings.critString;
-	if (critText.includes("br5e.critString")) {
+	if (critText.includes("brSnS.critString")) {
 		critText = i18n(critText);
 		game.settings.set("betterrollsSnS", "critString", critText);
 	}
+
+	// Set up socket
+	game.socket.on("module.betterrollsSnS", (data) => {
+		if (data?.action === "roll-sound") {
+			Utils.playDiceSound();
+		}
+	});
 
 	// Initialize Better Rolls
 	window.BetterRolls = BetterRolls();
@@ -49,9 +62,7 @@ Hooks.on("ready", () => {
 });
 
 // Create flags for item when it's first created
-Hooks.on("preCreateOwnedItem", (actor, itemData) => {
-	ItemUtils.ensureDataFlags(itemData);
-});
+Hooks.on("preCreateItem", (item) => ItemUtils.ensureFlags(item));
 
 // Modify context menu for damage rolls (they break)
 Hooks.on("getChatLogEntryContext", (html, options) => {

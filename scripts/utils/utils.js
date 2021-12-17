@@ -30,32 +30,6 @@ function isMaestroOn() {
 	return output;
 }
 
-/**
- * Returns a new object containing a subset of source
- * using the keys in props. Equivalent to lodash's pick method.
- * @param {object} source
- * @param {string[]} props
- * @returns {object} subset of source
- */
-export function pick(source, props) {
-	const result = {};
-	for (const prop of props) {
-		result[prop] = source[prop];
-	}
-	return result;
-}
-
-export function pickBy(source, predicate) {
-	const props = [];
-	for (const [key, value] of Object.entries(source)) {
-		if (predicate(value, key)) {
-			props.push(key);
-		}
-	}
-
-	return pick(source, props);
-}
-
 export class Utils {
 	static getVersion() {
 		return game.modules.get("betterrollsSnS").data.version;
@@ -69,28 +43,33 @@ export class Utils {
 	 * @returns {string}
 	 */
 	static getDiceSound(hasMaestroSound=false) {
-		const has3DDiceSound = game.dice3d ? game.settings.get("dice-so-nice", "settings").enabled : false;
-		const playRollSounds = game.settings.get("betterrollsSnS", "playRollSounds")
-
-		if (playRollSounds && !has3DDiceSound && !hasMaestroSound) {
+		const playRollSounds = game.settings.get("betterrollsSnS", "playRollSounds");
+		if (playRollSounds && !game.dice3d?.isEnabled() && !hasMaestroSound) {
 			return CONFIG.sounds.dice;
 		}
 
 		return null;
 	}
 
+	static playDiceSound() {
+		if (!Utils._playSoundLock) {
+			Utils._playSoundLock = true;
+			AudioHelper.play({ src: CONFIG.sounds.dice });
+			setTimeout(() => Utils._playSoundLock = false, 300);
+		}
+	}
+
 	/**
 	 * Additional data to attach to the chat message.
 	 */
-	static getWhisperData() {
-		let rollMode = null;
+	static getWhisperData(rollMode = null) {
 		let whisper = undefined;
 		let blind = null;
 
-		rollMode = game.settings.get("core", "rollMode");
+		rollMode = rollMode || game.settings.get("core", "rollMode");
 		if ( ["gmroll", "blindroll"].includes(rollMode) ) whisper = ChatMessage.getWhisperRecipients("GM");
 		if ( rollMode === "blindroll" ) blind = true;
-		else if ( rollMode === "selfroll" ) whisper = [game.user._id];
+		else if ( rollMode === "selfroll" ) whisper = [game.user.id];
 
 		return { rollMode, whisper, blind }
 	}
@@ -138,34 +117,16 @@ export class Utils {
 	}
 
 	/**
-	 * Returns an {adv, disadv} object when given an event.
-	 * This one is done via a dialog, and will likely be tweaked eventually
+	 * Returns an {advantage, disadvantage} object when given an event.
 	 */
-	static async eventToAdvantage(ev) {
+	static eventToAdvantage(ev={}) {
 		if (ev.shiftKey) {
-			return {adv:1, disadv:0};
-		} else if ((keyboard.isCtrl(ev))) {
-			return {adv:0, disadv:1};
+			return {advantage: 1, disadvantage:0};
+		} else if (ev.ctrlKey || ev.metaKey) {
+			return {advantage: 0, disadvantage:1};
 		} else {
-			return {adv:0, disadv:0};
+			return {advantage: 0, disadvantage:0};
 		}
-	}
-
-	/**
-	 * Get roll state modifiers given a browser event
-	 * @param {*} ev
-	 */
-	static getEventRollModifiers(eventToCheck) {
-		const result = {};
-		if (!eventToCheck) { return; }
-		if (eventToCheck.shiftKey) {
-			result.adv = 1;
-		}
-		if (keyboard.isCtrl(eventToCheck)) {
-			result.disadv = 1;
-		}
-
-		return result;
 	}
 
 	/**
@@ -173,23 +134,14 @@ export class Utils {
 	 * @param {object} param0
 	 * @returns {import("../fields.js").RollState}
 	 */
-	static getRollState({rollState=null, event=null, adv=null, disadv=null}={}) {
+	static getRollState({rollState=null, event=null, advantage=null, disadvantage=null, adv=null, disadv=null}={}) {
 		if (rollState) return rollState;
-
-		if (adv || disadv) {
-			adv = adv || 0;
-			disadv = disadv || 0;
-			if (adv > 0 || disadv > 0) {
-				if (adv > disadv) { return "highest"; }
-				else if (adv < disadv) { return "lowest"; }
-			} else {
-				return null;
-			}
-		}
+		if (advantage || adv) return "highest";
+		if (disadvantage || disadv) return "lowest";
 
 		if (event) {
-			const modifiers = Utils.getEventRollModifiers(event);
-			if (modifiers.adv || modifiers.disadv) {
+			const modifiers = Utils.eventToAdvantage(event);
+			if (modifiers.advantage || modifiers.disadvantage) {
 				return Utils.getRollState(modifiers);
 			}
 		}
@@ -225,22 +177,30 @@ export class Utils {
 	}
 
 	/**
-	 * Returns all selected actors
-	 * @param param1.required True if a warning should be shown if the list is empty
+	 * Retrieves all tokens currently selected on the canvas. This is the normal select,
+	 * not the target select.
 	 */
-	static getTargetActors({required=false}={}) {
+	static getTargetTokens({required=false}={}) {
 		const character = game.user.character;
 		const controlled = canvas.tokens.controlled;
 		if (!controlled.length && character) {
 			return [character];
 		}
 
-		const results = controlled.map(character => character.actor).filter(a => a);
+		const results = controlled.filter(a => a);
 		if (required && !controlled.length) {
 			ui.notifications.warn(game.i18n.localize("SNS.ActionWarningNoToken"));
 		}
 
 		return results;
+	}
+
+	/**
+	 * Returns all selected actors
+	 * @param param1.required True if a warning should be shown if the list is empty
+	 */
+	static getTargetActors({required=false}={}) {
+		return Utils.getTargetTokens({required}).map(character => character.actor).filter(a => a);
 	}
 
 	/**
@@ -251,11 +211,11 @@ export class Utils {
 	static getRollFlavors(...rolls) {
 		const flavors = new Set();
 		for (const roll of rolls) {
-			for (const term of (roll?.terms ?? roll?.rolls ?? [])) {
+			for (const term of (roll?.terms ?? roll?.results ?? [])) {
 				if (term.options?.flavor) {
 					flavors.add(term.options.flavor);
 				}
-				if (term.terms || term.rolls) {
+				if (term.terms || term.results) {
 					Utils.getRollFlavors(term).forEach(flavors.add.bind(flavors));
 				}
 			}
@@ -291,6 +251,10 @@ export class Utils {
 
 		// Determine if advantage/disadvantage, and how many rolls
 		const d20Term = Utils.findD20Term(roll);
+		if (!d20Term) {
+			return { formula: roll.formula };
+		}
+
 		const numRolls = d20Term.number;
 		const rollState = d20Term.modifiers.includes("kh")
 			? "highest"
@@ -309,15 +273,6 @@ export class Utils {
 }
 
 export class ActorUtils {
-	/**
-	 * Returns a special id for a token that can be used to retrieve it
-	 * from anywhere.
-	 * @param {*} token
-	 */
-	static getTokenId(token) {
-		return [canvas.tokens.get(token.id).scene.id, token.id].join(".")
-	}
-
 	/**
 	 * True if the actor has the halfling luck special trait.
 	 * @param {Actor} actor
@@ -385,7 +340,7 @@ export class ActorUtils {
 	static getImage(actor) {
 		if (!actor) return null;
 
-		const actorImage = (actor.data.img && actor.data.img !== DEFAULT_TOKEN && !actor.data.img.includes("*")) ? actor.data.img : false;
+		const actorImage = (actor.data.img && actor.data.img !== CONST.DEFAULT_TOKEN && !actor.data.img.includes("*")) ? actor.data.img : false;
 		const tokenImage = actor.token?.data?.img ? actor.token.data.img : actor.data.token.img;
 
 		switch(game.settings.get("betterrollsSnS", "defaultRollArt")) {
@@ -466,7 +421,7 @@ export class ItemUtils {
 
 		// Get item crit. If its a weapon or spell, it might have a DND flag to change the range
 		// We take the smallest item crit value
-		let itemCrit = Number(getProperty(item, "data.flags.betterRolls5e.critRange.value")) || 20;
+		let itemCrit = Number(getProperty(item, "data.flags.betterRollsSnS.critRange.value")) || 20;
 		const characterCrit = ActorUtils.getCritThreshold(item.actor, item.data.type);
 		return Math.min(20, characterCrit, itemCrit);
 	}
@@ -501,19 +456,19 @@ export class ItemUtils {
 		let componentString = "";
 
 		if (vocal) {
-			componentString += i18n("br5e.chat.abrVocal");
+			componentString += i18n("brSnS.chat.abrVocal");
 		}
 
 		if (somatic) {
-			componentString += i18n("br5e.chat.abrSomatic");
+			componentString += i18n("brSnS.chat.abrSomatic");
 		}
 
 		if (material) {
 			const materials = item.data.data.materials;
-			componentString += i18n("br5e.chat.abrMaterial");
+			componentString += i18n("brSnS.chat.abrMaterial");
 
 			if (materials.value) {
-				const materialConsumption = materials.consumed ? i18n("br5e.chat.consumedBySpell") : ""
+				const materialConsumption = materials.consumed ? i18n("brSnS.chat.consumedBySpell") : ""
 				componentString += ` (${materials.value}` + ` ${materialConsumption})`;
 			}
 		}
@@ -539,29 +494,31 @@ export class ItemUtils {
 	 * @param {boolean} commit whether to update at the end or not
 	 */
 	static async ensureFlags(item, { commit=true } = {}) {
-		const flags = this.ensureDataFlags(item?.data);
+		const flags = this.createFlags(item?.data);
+		if (!flags) return;
+		item.data.flags.betterRollsSnS = flags;
 
 		// Save the updates. Foundry checks for diffs to avoid unnecessary updates
 		if (commit) {
-			await item.update({"flags.betterRolls5e": flags}, { diff: true });
+			await item.data.update({ "flags.betterRollsSnS": flags }, { diff: true });
 		}
 	}
 
 	/**
-	 * Assigns the data flags to the item. Does not save to database.
+	 * Creates the flags that should be assigned to the the item. Does not save to database.
 	 * @param {*} itemData The item.data property to be updated
 	 */
-	static ensureDataFlags(itemData) {
-		if (!itemData || CONFIG.betterRolls5e.validItemTypes.indexOf(itemData.type) == -1) { return; }
+	static createFlags(itemData) {
+		if (!itemData || CONFIG.betterRollsSnS.validItemTypes.indexOf(itemData.type) == -1) { return; }
 
 		// Initialize flags
 		itemData.flags = itemData.flags ?? {};
-		const baseFlags = duplicate(CONFIG.betterRolls5e.allFlags[itemData.type.concat("Flags")]);
-		let flags = duplicate(itemData.flags.betterRolls5e ?? {});
+		const baseFlags = duplicate(CONFIG.betterRollsSnS.allFlags[itemData.type.concat("Flags")]);
+		let flags = duplicate(itemData.flags.betterRollsSnS ?? {});
 		flags = mergeObject(baseFlags, flags ?? {});
 
 		// If quickDamage flags should exist, update them based on which damage formulae are available
-		if (CONFIG.betterRolls5e.allFlags[itemData.type.concat("Flags")].quickDamage) {
+		if (CONFIG.betterRollsSnS.allFlags[itemData.type.concat("Flags")].quickDamage) {
 			let newQuickDamageValues = [];
 			let newQuickDamageAltValues = [];
 
@@ -579,8 +536,7 @@ export class ItemUtils {
 			flags.quickDamage.altValue = newQuickDamageAltValues;
 		}
 
-		itemData.flags.betterRolls5e = flags;
-		return itemData.flags.betterRolls5e;
+		return flags;
 	}
 
 	static placeTemplate(item) {
@@ -595,6 +551,7 @@ export class ItemUtils {
 	 * Finds if an item has a Maestro sound on it, in order to determine whether or not the dice sound should be played.
 	 */
 	static hasMaestroSound(item) {
+		if (!item) return false;
 		return (isMaestroOn() && item.data.flags.maestro && item.data.flags.maestro.track) ? true : false;
 	}
 
@@ -785,12 +742,12 @@ export class ItemUtils {
 				break;
 			case "spell":
 				// Spell attack labels
-				data.damageLabel = data.actionType === "heal" ? i18n("br5e.chat.healing") : i18n("br5e.chat.damage");
+				data.damageLabel = data.actionType === "heal" ? i18n("brSnS.chat.healing") : i18n("brSnS.chat.damage");
 				data.isAttack = data.actionType === "attack";
 
 				properties = [
+					sns.spellLevels[data.castedLevel ?? data.level],
 					sns.spellSchools[data.school],
-					sns.spellLevels[data.level],
 					data.components.ritual ? i18n("Ritual") : null,
 					activation,
 					duration,

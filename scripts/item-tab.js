@@ -11,7 +11,7 @@ export async function addBetterRollsContent(app, protoHtml) {
 	const itemData = item.data.data;
 
 	if (item.actor && item.actor.permission < 3) { return; }
-	if (CONFIG.betterRolls5e.validItemTypes.indexOf(item.data.type) == -1) { return; }
+	if (CONFIG.betterRollsSnS.validItemTypes.indexOf(item.data.type) == -1) { return; }
 
 	// Initialize flags. Don't commit to avoid a nested re-render
 	await ItemUtils.ensureFlags(item, { commit: false });
@@ -24,7 +24,7 @@ export async function addBetterRollsContent(app, protoHtml) {
 
 	// Create tab (for selection)
 	const tabSelector = html.find("form nav.sheet-navigation.tabs");
-	const betterRollsTabString = `<a class="item" data-group="primary" data-tab="betterRolls5e">${i18n("Better Rolls")}</a>`;
+	const betterRollsTabString = `<a class="item" data-group="primary" data-tab="betterRollsSnS">${i18n("Better Rolls")}</a>`;
 	tabSelector.append($(betterRollsTabString));
 
 	const settingsContainer = html.find(".sheet-body");
@@ -53,7 +53,7 @@ export async function addBetterRollsContent(app, protoHtml) {
 		isAttack: isAttack(item),
 		isSave: isSave(item),
 		flags: item.data.flags,
-		damageTypes: CONFIG.betterRolls5e.combinedDamageTypes,
+		damageTypes: CONFIG.betterRollsSnS.combinedDamageTypes,
 		altSecondaryEnabled,
 		itemHasTemplate: item.hasAreaTarget
 	});
@@ -62,7 +62,7 @@ export async function addBetterRollsContent(app, protoHtml) {
 
 	// Tab back to better rolls if we need (after certain events it may happen)
 	if (activate) {
-		app._tabs[0].activate("betterRolls5e");
+		app._tabs[0].activate("betterRollsSnS");
 		app.setPosition();
 		activate = false;
 	}
@@ -71,27 +71,27 @@ export async function addBetterRollsContent(app, protoHtml) {
 	if (game.settings.get("betterrollsSnS", "damageContextPlacement") !== "0") {
 		const damageRolls = html.find(".tab.details .damage-parts .damage-part input").toArray();
 		// Placeholder is either "Context" or "Label" depending on system settings
-		const placeholder = game.settings.get("betterrollsSnS", "contextReplacesDamage") ? "br5e.settings.label" : "br5e.settings.context";
+		const placeholder = game.settings.get("betterrollsSnS", "contextReplacesDamage") ? "brSnS.settings.label" : "brSnS.settings.context";
 
 		damageRolls.forEach((damageRoll, i) => {
-			const contextField = $(`<input type="text" name="flags.betterRolls5e.quickDamage.context.${i}" value="${(item.data.flags.betterRolls5e.quickDamage.context[i] || "")}" placeholder="${i18n(placeholder)}" data-dtype="String" style="margin-left:5px;">`);
+			const contextField = $(`<input type="text" name="flags.betterRollsSnS.quickDamage.context.${i}" value="${(item.data.flags.betterRollsSnS.quickDamage.context[i] || "")}" placeholder="${i18n(placeholder)}" data-dtype="String" style="margin-left:5px;">`);
 
 			damageRoll.after(contextField[0]);
 
 			// Add event listener to delete context when damage is deleted
 			$($($(damageRoll)[0].parentElement).find(`a.delete-damage`)).click(async _ => {
-				const contextFlags = Object.values(item.data.flags.betterRolls5e.quickDamage.context);
+				const contextFlags = Object.values(item.data.flags.betterRollsSnS.quickDamage.context);
 				contextFlags.splice(i, 1);
 				item.update({
-					[`flags.betterRolls5e.quickDamage.context`]: contextFlags,
+					[`flags.betterRollsSnS.quickDamage.context`]: contextFlags,
 				});
 			});
 		});
 
 		// Add context field for Other Formula field
-		if (getProperty(item, "data.flags.betterRolls5e.quickOther")) {
+		if (getProperty(item, "data.flags.betterRollsSnS.quickOther")) {
 			const otherRoll = html.find(`.tab.details .form-fields input[name="data.formula"]`);
-			const otherContextField = $(`<input type="text" name="flags.betterRolls5e.quickOther.context" value="${(item.data.flags.betterRolls5e.quickOther.context || "")}" placeholder="${i18n(placeholder)}" data-dtype="String" style="margin-left:5px;">`);
+			const otherContextField = $(`<input type="text" name="flags.betterRollsSnS.quickOther.context" value="${(item.data.flags.betterRollsSnS.quickOther.context || "")}" placeholder="${i18n(placeholder)}" data-dtype="String" style="margin-left:5px;">`);
 			if (otherRoll[0]) { otherRoll[0].after(otherContextField[0]); }
 		}
 	}

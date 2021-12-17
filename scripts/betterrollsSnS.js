@@ -33,9 +33,10 @@ export function isCheck(item) {
 export function addItemContent(actor, html,
 	triggeringElement = ".item .item-name h4",
 	buttonContainer = ".item-properties",
-	itemButton = ".item .rollable") {
-	(game.settings.get("betterrollsSnS", "rollButtonsEnabled") && triggeringElement && buttonContainer) ? addItemSheetButtons(actor, html, null, triggeringElement, buttonContainer) : null;
-	itemButton ? changeRollsToDual(actor, html, null, {itemButton: itemButton}) : null;
+) {
+	if (game.settings.get("betterrollsSnS", "rollButtonsEnabled") && triggeringElement && buttonContainer) {
+		addItemSheetButtons(actor, html, null, triggeringElement, buttonContainer)
+	}
 }
 
 const sns = SNS;
@@ -44,7 +45,7 @@ function getQuickDescriptionDefault() {
 	return getSettings().quickDefaultDescriptionEnabled;
 }
 
-CONFIG.betterRolls5e = {
+CONFIG.betterRollsSnS = {
 	validItemTypes: ["weapon", "spell", "equipment", "feat", "tool", "consumable"],
 	allFlags: {
 		weaponFlags: {
@@ -56,7 +57,7 @@ CONFIG.betterRolls5e = {
 			quickDamage: { type: "Array", value: [], altValue: [], context: [] },
 			quickVersatile: { type: "Boolean", value: false, altValue: false },
 			quickProperties: { type: "Boolean", value: true, altValue: true },
-			quickCharges: { type: "Boolean", value: {quantity: false, use: false, resource: true}, altValue: {quantity: false, use: false, resource: true} },
+			quickCharges: { type: "Boolean", value: {quantity: false, use: false, resource: true}, altValue: {quantity: false, use: true, resource: true} },
 			quickTemplate: { type: "Boolean", value: true, altValue: true },
 			quickOther: { type: "Boolean", value: true, altValue: true, context: "" },
 			quickFlavor: { type: "Boolean", value: true, altValue: true },
@@ -71,7 +72,7 @@ CONFIG.betterRolls5e = {
 			quickDamage: { type: "Array", value: [], altValue: [], context: [] },
 			quickVersatile: { type: "Boolean", value: false, altValue: false },
 			quickProperties: { type: "Boolean", value: true, altValue: true },
-			quickCharges: { type: "Boolean", value: {use: false, resource: true}, altValue: {use: false, resource: true} },
+			quickCharges: { type: "Boolean", value: {use: true, resource: true}, altValue: {use: true, resource: true} },
 			quickTemplate: { type: "Boolean", value: true, altValue: true },
 			quickOther: { type: "Boolean", value: true, altValue: true, context: "" },
 			quickFlavor: { type: "Boolean", value: true, altValue: true },
@@ -99,7 +100,7 @@ CONFIG.betterRolls5e = {
 			quickDamage: { type: "Array", value: [], altValue: [], context: [] },
 			quickProperties: { type: "Boolean", value: true, altValue: true },
 			// Feats consume uses by default in vanilla 5e
-			quickCharges: { type: "Boolean", value: {use: true, resource: true, charge: false}, altValue: {use: true, resource: true, charge: false} },
+			quickCharges: { type: "Boolean", value: {use: true, resource: true, charge: true}, altValue: {use: true, resource: true, charge: true} },
 			quickTemplate: { type: "Boolean", value: true, altValue: true },
 			quickOther: { type: "Boolean", value: true, altValue: true, context: "" },
 			quickFlavor: { type: "Boolean", value: true, altValue: true },
@@ -177,9 +178,9 @@ async function addButtonsToItemLi(li, actor, buttonContainer) {
 		return;
 	}
 
-	const item = actor.getOwnedItem(itemId);
+	const item = actor.items.get(itemId);
 	const itemData = item.data.data;
-	const flags = item.data.flags.betterRolls5e;
+	const flags = item.data.flags.betterRollsSnS;
 
 	// Check settings
 	const settings = getSettings();
@@ -200,13 +201,13 @@ async function addButtonsToItemLi(li, actor, buttonContainer) {
 		case 'consumable':
 			buttonsWereAdded = true;
 			buttons.append(
-				createButton({ content: i18n("br5e.buttons.roll"), action: "quickRoll" }),
-				createButton({ content: i18n("br5e.buttons.altRoll"), action: "altRoll"})
+				createButton({ content: i18n("brSnS.buttons.roll"), action: "quickRoll" }),
+				createButton({ content: i18n("brSnS.buttons.altRoll"), action: "altRoll"})
 			);
 
 			if (isAttack(item)) {
 				buttons.append(
-					createButton({ content: i18n("br5e.buttons.attack"), action: "attackRoll"})
+					createButton({ content: i18n("brSnS.buttons.attack"), action: "attackRoll"})
 				);
 			}
 
@@ -215,7 +216,7 @@ async function addButtonsToItemLi(li, actor, buttonContainer) {
 
 				buttons.append(
 					createButton({
-						content: `${i18n("br5e.buttons.saveDC")} ${saveData.dc} ${sns.abilities[saveData.ability]}`,
+						content: `${i18n("brSnS.buttons.saveDC")} ${saveData.dc} ${sns.abilities[saveData.ability]}`,
 						action: "save"
 					})
 				);
@@ -223,12 +224,12 @@ async function addButtonsToItemLi(li, actor, buttonContainer) {
 
 			if (itemData.damage.parts.length > 0) {
 				buttons.append(
-					createButton({ content: i18n("br5e.buttons.damage"), action: "damageRoll", value: "all" })
+					createButton({ content: i18n("brSnS.buttons.damage"), action: "damageRoll", value: "all" })
 				);
 
 				if (itemData.damage.versatile) {
 					buttons.append(
-						createButton({ content: i18n("br5e.buttons.verDamage"), action: "verDamageRoll", value: "all" })
+						createButton({ content: i18n("brSnS.buttons.verDamage"), action: "verDamageRoll", value: "all" })
 					);
 				}
 
@@ -239,7 +240,7 @@ async function addButtonsToItemLi(li, actor, buttonContainer) {
 					itemData.damage.parts.forEach(([_, damageType], i) => {
 						const damageString =
 							(contextEnabled && flags.quickDamage.context[i]) ||
-							CONFIG.betterRolls5e.combinedDamageTypes[damageType];
+							CONFIG.betterRollsSnS.combinedDamageTypes[damageType];
 
 						let content = `${i}: ${damageString}`;
 
@@ -255,7 +256,7 @@ async function addButtonsToItemLi(li, actor, buttonContainer) {
 			}
 
 			if (itemData.formula.length > 0) {
-				const otherString = contextEnabled && flags.quickOther.context || "br5e.settings.otherFormula";
+				const otherString = contextEnabled && flags.quickOther.context || i18n("brSnS.settings.otherFormula");
 
 				buttons.append(
 					createButton({ content: otherString, action: "otherFormulaRoll" })
@@ -269,14 +270,14 @@ async function addButtonsToItemLi(li, actor, buttonContainer) {
 
 			buttons.append(
 				createButton({
-					content: `${i18n("br5e.buttons.itemUse")} ${item.name}`,
+					content: `${i18n("brSnS.buttons.itemUse")} ${item.name}`,
 					action: "toolCheck",
 					value: itemData.ability.value
 				})
 			);
 
 			if (itemData.formula && itemData.formula.length > 0) {
-				const otherString = (contextEnabled && flags.quickOther.context) || "br5e.settings.otherFormula";
+				const otherString = (contextEnabled && flags.quickOther.context) || i18n("brSnS.settings.otherFormula");
 
 				buttons.append(
 					createButton({ content: otherString, action: "otherFormulaRoll" })
@@ -292,12 +293,12 @@ async function addButtonsToItemLi(li, actor, buttonContainer) {
 
 	// Add info button
 	buttons.append(
-		createButton({ content: i18n("br5e.buttons.info"), action: "infoRoll" })
+		createButton({ content: i18n("brSnS.buttons.info"), action: "infoRoll" })
 	);
 
 	// Add default roll button
 	buttons.append(
-		createButton({ content: i18n("br5e.buttons.defaultSheetRoll"), action: "vanillaRoll" })
+		createButton({ content: i18n("brSnS.buttons.defaultSheetRoll"), action: "vanillaRoll" })
 	);
 
 	if (buttonsWereAdded) {
@@ -352,7 +353,7 @@ async function addButtonsToItemLi(li, actor, buttonContainer) {
 			case 'infoRoll':
 				fields.push(["desc"]); params.properties = true; break;
 			case 'vanillaRoll':
-				item.actor.sheet._onItemRoll(event); break;
+				item.roll({ vanilla: true });
 		}
 
 		if (ev.target.dataset.action !== 'vanillaRoll') {
@@ -361,164 +362,30 @@ async function addButtonsToItemLi(li, actor, buttonContainer) {
 	});
 }
 
-// Gets the total of all damage rolls from a given Better Roll HTML
-export function getTotalDamage(html) {
-	return;
-}
-
-/**
- * Replaces the sheet's d20 rolls for ability checks, skill checks, and saving throws into dual d20s.
- * Also replaces the default button on items with a "standard" roll.
- */
-export function changeRollsToDual (actor, html, data, params) {
-	if (actor && actor.permission < 3) { return; }
-
-	let paramRequests = mergeObject({
-			abilityButton: '.ability-name',
-			checkButton: '.ability-mod',
-			saveButton: '.ability-save',
-			skillButton: '.skill-name',
-			itemButton: '.item:not(.magic-item) .item-image',
-			singleAbilityButton: true
-		},params || {});
-
-	function getAbility(target) {
-		let ability = null;
-		for (let i=0; i <= 3; i++) {
-			ability = target.getAttribute("data-ability");
-			if (ability) { break; }
-			else {
-				target = target.parentElement;
-			}
-		}
-		return ability;
-	}
-
-	// Assign new action to ability check button
-	let abilityName = html.find(paramRequests.abilityButton);
-	if (abilityName.length > 0 && paramRequests.singleAbilityButton === true) {
-		abilityName.off();
-		abilityName.click(event => {
-			event.preventDefault();
-			let ability = getAbility(event.currentTarget),
-				abl = actor.data.data.abilities[ability];
-			if ( keyboard.isCtrl(event) ) {
-				CustomRoll.rollAttribute(actor, ability, "check");
-			} else if ( event.shiftKey ) {
-				CustomRoll.rollAttribute(actor, ability, "save");
-			} else {
-				new Dialog({
-					title: `${i18n(sns.abilities[ability])} ${i18n("Ability Roll")}`,
-					content: `<p><span style="font-weight: bold;">${i18n(sns.abilities[ability])}:</span> ${i18n("What type of roll?")}</p>`,
-					buttons: {
-						test: {
-							label: i18n("Ability Check"),
-							callback: async () => { params = await Utils.eventToAdvantage(event); CustomRoll.rollAttribute(actor, ability, "check"); }
-						},
-						save: {
-							label: i18n("Saving Throw"),
-							callback: async () => { params = await Utils.eventToAdvantage(event); CustomRoll.rollAttribute(actor, ability, "save"); }
-						}
-					}
-				}).render(true);
-			}
-		});
-	}
-
-	// Assign new action to ability button
-	let checkName = html.find(paramRequests.checkButton);
-	if (checkName.length > 0) {
-		checkName.off();
-		checkName.addClass("rollable");
-		checkName.click(async event => {
-			event.preventDefault();
-			let ability = getAbility(event.currentTarget),
-				abl = actor.data.data.abilities[ability],
-				params = await Utils.eventToAdvantage(event);
-			CustomRoll.rollAttribute(actor, ability, "check", params);
-		});
-	}
-
-	// Assign new action to save button
-	let saveName = html.find(paramRequests.saveButton);
-	if (saveName.length > 0) {
-		saveName.off();
-		saveName.addClass("rollable");
-		saveName.click(async event => {
-			event.preventDefault();
-			let ability = getAbility(event.currentTarget),
-				abl = actor.data.data.abilities[ability],
-				params = await Utils.eventToAdvantage(event);
-			CustomRoll.rollAttribute(actor, ability, "save", params);
-		});
-	}
-
-	// Assign new action to skill button
-	let skillName = html.find(paramRequests.skillButton);
-	if (skillName.length > 0) {
-		skillName.off();
-		skillName.click(async event => {
-			event.preventDefault();
-			let params = await Utils.eventToAdvantage(event);
-			let skill = event.currentTarget.parentElement.getAttribute("data-skill");
-			CustomRoll.rollSkill(actor, skill, params);
-		});
-	}
-
-	// Assign new action to item image button
-	let itemImage = html.find(paramRequests.itemButton);
-	if (itemImage.length > 0) {
-		itemImage.off();
-		itemImage.click(async event => {
-			const { imageButtonEnabled, altSecondaryEnabled } = getSettings();
-
-			let li = $(event.currentTarget).parents(".item"),
-				actorID = actor.id,
-				itemID = String(li.attr("data-item-id")),
-				item = actor.getOwnedItem(itemID),
-				params = await Utils.eventToAdvantage(event);
-
-			// Case 1 - If the image button should roll an "Item Macro" macro
-			try {
-				if (window.ItemMacro?.hasMacro(item) && game.settings.get('itemacro','charsheet')) {
-					event.preventDefault();
-					window.ItemMacro.runMacro(actorID, itemID);
-					return;
-				}
-			} catch (ex) {}
-
-			// Case 2 - If the image button should roll a vanilla roll
-			if (!imageButtonEnabled) {
-				item.actor.sheet._onItemRoll(event);
-
-			// Case 3 - If Alt is pressed
-			} else if (event.altKey) {
-				if (altSecondaryEnabled) {
-					event.preventDefault();
-					CustomRoll.newItemRoll(item, mergeObject(params, {preset:1})).toMessage();
-				} else {
-					item.actor.sheet._onItemRoll(event);
-				}
-			// Case 4 - If Alt is not pressed
-			} else {
-				event.preventDefault();
-				CustomRoll.newItemRoll(item, mergeObject(params, {preset:0})).toMessage();
-			}
-		});
-	}
-}
-
 /** Frontend for macros */
 export function BetterRolls() {
 	async function assignMacro(item, slot, mode) {
 		function command() {
-			switch (mode) {
-				case "name": return `BetterRolls.quickRoll("${item.name}");`;
-				case "id": return `BetterRolls.quickRollById("${item.actorId}", "${item.data._id}");`;
-				case "vanillaRoll": return `BetterRolls.vanillaRoll("${item.actorId}", "${item.data._id}");`;
-			}
+			const vanilla = mode === 'vanillaRoll' ? "true" : "false";
+			return `
+// HotbarUses5e: ActorID="${item.actorId}" ItemID="${item.data._id}"
+const actorId = "${item.actorId}";
+const itemId = "${item.data._id}";
+const actorToRoll = canvas.tokens.placeables.find(t => t.actor?.id === actorId)?.actor ?? game.actors.get(actorId);
+const itemToRoll = actorToRoll?.items.get(itemId);
+
+if (game.modules.get('itemacro')?.active && itemToRoll.hasMacro()) {
+	return itemToRoll.executeMacro();
+}
+
+if (!itemToRoll) {
+	return ui.notifications.warn(game.i18n.format("SNS.ActionWarningNoItem", { item: itemId, name: actorToRoll?.name ?? "[Not Found]" }));
+}
+
+return itemToRoll.roll({ vanilla: ${vanilla} });
+`;
 		}
-		let macro = game.macros.entities.find(m => (m.name === item.name) && (m.command === command));
+		let macro = game.macros.find(m => (m.name === item.name) && (m.command === command));
 		if (!macro) {
 			macro = await Macro.create({
 				name: item.data.name,
@@ -534,11 +401,11 @@ export function BetterRolls() {
 	// Performs a vanilla roll message, searching the actor and item by ID.
 	function vanillaRoll(actorId, itemId) {
 		let actor = getActorById(actorId);
-		if (!actor) { return ui.notifications.warn(`${i18n("br5e.error.noActorWithId")}`); }
-		let item = actor.getOwnedItem(itemId);
-		if (!item) { return ui.notifications.warn(`${i18n("br5e.error.noItemWithId")}`); }
-		if (actor.permission != 3) { return ui.notifications.warn(`${i18n("br5e.error.noActorPermission")}`); }
-		return item.roll();
+		if (!actor) { return ui.notifications.warn(`${i18n("brSnS.error.noActorWithId")}`); }
+		let item = actor.items.get(itemId);
+		if (!item) { return ui.notifications.warn(`${i18n("brSnS.error.noItemWithId")}`); }
+		if (actor.permission != 3) { return ui.notifications.warn(`${i18n("brSnS.error.noActorPermission")}`); }
+		return item.roll({ vanilla: true, event });
 	};
 
 	// Performs a Quick Roll, searching for an item in the controlled actor by name.
@@ -546,29 +413,29 @@ export function BetterRolls() {
 		let speaker = ChatMessage.getSpeaker();
 		let actor = getActorById(speaker.actor);
 		let item = actor ? actor.items.find(i => i.name === itemName) : null;
-		if (!actor) { return ui.notifications.warn(`${i18n("br5e.error.noSelectedActor")}`); }
-		else if (!item) { return ui.notifications.warn(`${actor.name} ${i18n("br5e.error.noKnownItemOnActor")} ${itemName}`); }
-		return new CustomItemRoll(item, {event, preset:(isAlt(event) ? 1 : 0)}).toMessage();
+		if (!actor) { return ui.notifications.warn(`${i18n("brSnS.error.noSelectedActor")}`); }
+		else if (!item) { return ui.notifications.warn(`${actor.name} ${i18n("brSnS.error.noKnownItemOnActor")} ${itemName}`); }
+		return item.roll({ vanilla: false, event });
 	};
 
 	// Performs a Quick Roll, searching the actor and item by ID.
 	function quickRollById(actorId, itemId) {
 		let actor = getActorById(actorId);
-		if (!actor) { return ui.notifications.warn(`${i18n("br5e.error.noActorWithId")}`); }
-		let item = actor.getOwnedItem(itemId);
-		if (!item) { return ui.notifications.warn(`${i18n("br5e.error.noItemWithId")}`); }
-		if (actor.permission != 3) { return ui.notifications.warn(`${i18n("br5e.error.noActorPermission")}`); }
-		return new CustomItemRoll(item, {event, preset:(isAlt(event) ? 1 : 0)}).toMessage();
+		if (!actor) { return ui.notifications.warn(`${i18n("brSnS.error.noActorWithId")}`); }
+		let item = actor.items.get(itemId);
+		if (!item) { return ui.notifications.warn(`${i18n("brSnS.error.noItemWithId")}`); }
+		if (actor.permission != 3) { return ui.notifications.warn(`${i18n("brSnS.error.noActorPermission")}`); }
+		return item.roll({ vanilla: false, event });
 	};
 
 	// Performs a Quick Roll, searching the actor and item by name.
 	function quickRollByName(actorName, itemName) {
 		let actor = getActorByName(actorName);
-		if (!actor) { return ui.notifications.warn(`${i18n("br5e.error.noKnownActorWithName")}`); }
+		if (!actor) { return ui.notifications.warn(`${i18n("brSnS.error.noKnownActorWithName")}`); }
 		let item = actor.items.find(i => i.name === itemName);
-		if (!item) { return ui.notifications.warn(`${actor.name} ${i18n("br5e.error.noKnownItemOnActor")} ${itemName}`); }
-		if (actor.permission != 3) { return ui.notifications.warn(`${i18n("br5e.error.noActorPermission")}`); }
-		return new CustomItemRoll(item, {event, preset:(isAlt(event) ? 1 : 0)}).toMessage();
+		if (!item) { return ui.notifications.warn(`${actor.name} ${i18n("brSnS.error.noKnownItemOnActor")} ${itemName}`); }
+		if (actor.permission != 3) { return ui.notifications.warn(`${i18n("brSnS.error.noActorPermission")}`); }
+		return item.roll({ vanilla: false, event });
 	};
 
 	// Returns if an event should have its corresponding Quick Roll be an Alt Roll.
@@ -579,15 +446,15 @@ export function BetterRolls() {
 
 	// Prefer synthetic actors over game.actors to avoid consumables and spells being missdepleted.
 	function getActorById(actorId) {
-		let actor = canvas.tokens.placeables.find(t => t.actor?._id === actorId)?.actor;
-		if (!actor) actor = game.actors.entities.find(a => a._id === actorId);
+		let actor = canvas.tokens.placeables.find(t => t.actor?.id === actorId)?.actor;
+		if (!actor) actor = game.actors.get(actorId);
 		return actor;
 	}
 
 	// Prefer token actors over game.actors to avoid consumables and spells being missdepleted.
 	function getActorByName(actorName) {
 		let actor = canvas.tokens.placeables.find(p => p.data.name === actorName)?.actor;
-		if (!actor) actor = game.actors.entities.find(e => e.name === actorName);
+		if (!actor) actor = game.actors.find(e => e.name === actorName);
 		return actor;
 	}
 
@@ -611,8 +478,6 @@ export function BetterRolls() {
 		addItemContent:addItemContent,
 		rollCheck:CustomRoll.rollCheck,
 		rollSave:CustomRoll.rollSave,
-		rollAbilityCheck:CustomRoll.rollAbilityCheck,
-		rollSavingThrow:CustomRoll.rollAbilitySave,
 		rollSkill:CustomRoll.rollSkill,
 		rollItem:CustomRoll.newItemRoll,
 		getRollState: (params) => Utils.getRollState({ event, ...(params ?? {})}),
